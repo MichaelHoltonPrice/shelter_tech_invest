@@ -16,6 +16,10 @@ library(triangle)
 # Clear the workspace
 rm(list=ls())
 
+# Set random number seed, which is an integer between 1 and 1,000,000 generated
+# at random.org
+set.seed(339652)
+
 # Helper function to simulate shelter choice
 simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
                                     min_W, max_W, min_rho, max_rho, Y,
@@ -84,8 +88,7 @@ simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
   T_indif <- Y / x_indif
 
   # Calculate the mean values of the discounted cost
-
-
+  
   return(list(p_vect = p_vect, x_indif = x_indif, T_indif = T_indif,
               mean_c_tipi = mean_c_tipi, mean_c_wick = mean_c_wick))
 }
@@ -140,9 +143,9 @@ mid_rho <- (min_rho + max_rho) / 2
 # Days per year
 Y <- 365
 T_vect <- seq(1, Y, by=1)
-# Number of samples per T. Using 100,000 samples is enough to yield very smooth
-# curves.
-S <- 100000
+# Number of samples per T. Using 1,000,000 samples is enough to yield stable
+# numbers and curves.
+S <- 1000000
 
 # Run simulations for different rho values
 results_variable <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_M,
@@ -158,6 +161,10 @@ results_max <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_M,
                                        stdv_M, min_W, max_W, min_rho, max_rho,
                                        Y, fixed_rho = max_rho)
 
+# Compute deterministic transition points
+T_determ <- Y * log((mean_H + mid_W - mean_M)/mean_H) / log(1 + mid_rho)
+moves_per_year_determ <- Y / T_determ
+
 # Make Figure 1
 # We limit the plot x-limits to 10 moves per year or less, since by then the
 # probability has already plateaued to 1.
@@ -167,7 +174,7 @@ x_fig1 <- moves_per_year[ind_fig1]
 y_fig1 <- results_variable$p_vect[ind_fig1]
 pdf('p_vs_yearly_moves.pdf')
     plot(x_fig1, y_fig1,
-    xlab='Moves per year',
+    xlab='Moves per Year',
     ylab='Probability Tipi is Preferred',
     type='l',
     lwd=3,
@@ -178,14 +185,25 @@ pdf('p_vs_yearly_moves.pdf')
          labels=c("0", "2", "4", "6", "8", "10", 
                   sprintf("%.2f", results_variable$x_indif)))
 
-    abline(v = results_variable$x_indif, col = "grey", lty = 2)
-    abline(h = 0.5, col = "grey", lty = 2)
+    abline(v = results_variable$x_indif, col = "grey")
+    abline(h = 0.5, col = "grey")
+    
+    # Add vertical line at moves_per_year_determ
+    abline(v = moves_per_year_determ, col = "grey", lty = 2)
+    
+    # Add legend
+    legend("bottomright",
+           legend = c("Simulated Indifference", "Deterministic Transition"),
+           col = c("grey", "grey"),
+           lty = c(1,2),
+           lwd = 2,
+           bty = "n")
 dev.off()
 
 # Make Figure 2
 pdf('p_vs_T.pdf')
     plot(T_vect, results_variable$p_vect,
-    xlab='Days between moves',
+    xlab='Days between Moves',
     ylab='Probability Tipi is Preferred',
     type='l',
     lwd=3,
@@ -199,14 +217,25 @@ pdf('p_vs_T.pdf')
          labels=c(T_indif_text),
          line=1)
 
-    abline(v = results_variable$T_indif, col = "grey", lty = 2)
-    abline(h = 0.5, col = "grey", lty = 2)
+    abline(v = results_variable$T_indif, col = "grey")
+    abline(h = 0.5, col = "grey")
+    
+    # Add vertical line at T_determ
+    abline(v = T_determ, col = "grey", lty = 2)
+    
+    # Add legend
+    legend("topright",
+           legend = c("Simulated Indifference", "Deterministic Transition"),
+           col = c("grey", "grey"),
+           lty = c(1,2),
+           lwd = 2,
+           bty = "n")
 dev.off()
 
 # Make Figure 3 (p_vect versus moves per year with fixed rho values)
 pdf('p_vs_yearly_moves_fixed_rho.pdf')
 plot(x_fig1, results_min$p_vect[ind_fig1],
-     xlab='Moves per year', ylab='Probability Tipi is Preferred',
+     xlab='Moves per Year', ylab='Probability Tipi is Preferred',
      type='l', lwd=2, col='black', xaxt='n', ylim=c(0,1))
 lines(x_fig1, results_mid$p_vect[ind_fig1], col='gray50', lwd=2)
 lines(x_fig1, results_max$p_vect[ind_fig1], col='gray70', lwd=2)
@@ -229,7 +258,7 @@ x_fig4 <- moves_per_year[ind_fig4]
 
 pdf('mean_c_vs_moves_per_year.pdf')
 plot(x_fig4, results_variable$mean_c_tipi[ind_fig4],
-     xlab='Moves per year',
+     xlab='Moves per Year',
      ylab='Mean Discounted Labor Cost',
      type='l', lwd=3, col='black',
      ylim=range(c(results_variable$mean_c_tipi[ind_fig4], 
@@ -248,6 +277,7 @@ dev.off()
 # Print indifference points
 cat("Indifference points (moves per year):\n")
 cat("Variable rho:", results_variable$x_indif, "\n")
+cat("Deterministic:", moves_per_year_determ, "\n")
 cat("Min rho:", results_min$x_indif, "\n")
 cat("Mid rho:", results_mid$x_indif, "\n")
 cat("Max rho:", results_max$x_indif, "\n")
@@ -255,6 +285,15 @@ cat("Max rho:", results_max$x_indif, "\n")
 # Print indifference points for T (days between moves)
 cat("\nIndifference points (days between moves):\n")
 cat("Variable rho:", results_variable$T_indif, "\n")
+cat("Deterministic:", T_determ, "\n")
 cat("Min rho:", results_min$T_indif, "\n")
 cat("Mid rho:", results_mid$T_indif, "\n")
 cat("Max rho:", results_max$T_indif, "\n")
+
+# Print mean costs for 4 moves per year
+ind4 <- which.min(abs(moves_per_year - 4))
+c_tipi4 <- results_variable$mean_c_tipi[ind4]
+c_wick4 <- results_variable$mean_c_wick[ind4]
+cat("c_tipi at 4 moves:", c_tipi4, "\n")
+cat("c_wick at 4 moves:", c_wick4, "\n")
+cat("Relative difference at 4 moves:", (c_wick4-c_tipi4)/c_tipi4, "\n")
