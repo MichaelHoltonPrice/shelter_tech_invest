@@ -297,3 +297,36 @@ c_wick4 <- results_variable$mean_c_wick[ind4]
 cat("c_tipi at 4 moves:", c_tipi4, "\n")
 cat("c_wick at 4 moves:", c_wick4, "\n")
 cat("Relative difference at 4 moves:", (c_wick4-c_tipi4)/c_tipi4, "\n")
+
+# Add a plot of tipi diameter versus total number of hides for the supplement
+# See:
+# https://albertashistoricplaces.com/2024/03/13/tipis-bison-and-dogs-visualizing-an-archaeological-feature-in-southern-alberta/
+tipi_diameters <- c(2.31, 4.60, 8.57)
+tipi_outer_hides <- c(6, 16, 42)
+tipi_inner_hides <- c(3, 8, 17)
+tipi_total_hides <- tipi_outer_hides + tipi_inner_hides
+# Do a linear fit
+tipi_fit <- lm(tipi_total_hides ~ tipi_diameters)
+tipi_fit_intercept <- as.numeric(tipi_fit$coefficients)[1]
+tipi_fit_slope <- as.numeric(tipi_fit$coefficients)[2]
+
+# Predict the diameter for a tipi with 15 total hides, of which 5 are for the
+# inner lining
+target_total_hides <- 15
+predicted_diameter <- (target_total_hides - tipi_fit_intercept)/tipi_fit_slope
+print(paste("Predicted tipi diameter for 15 total hides:", predicted_diameter))
+
+# Plot the total number of hides against the tipi diameter, along with the fit
+pdf('tipi_total_hides_versus_diameter.pdf')
+plot(tipi_diameters, tipi_total_hides,
+     xlab='Tipi Diameter (meters)',
+     ylab='Total Number of Hides',
+     type='p',
+     pch=16,
+     lwd=3,
+     col='black')
+abline(tipi_fit, col='grey', lwd=3)
+# Add dashed lines for the predicted values
+abline(h = target_total_hides, col='grey', lwd=2, lty=2)
+abline(v = predicted_diameter, col='grey', lwd=2, lty=2)
+dev.off()
