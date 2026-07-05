@@ -335,3 +335,114 @@ abline(tipi_fit, col='grey', lwd=3)
 abline(h = target_total_hides, col='grey', lwd=2, lty=2)
 abline(v = predicted_diameter, col='grey', lwd=2, lty=2)
 dev.off()
+
+# =====================================================================
+# Sensitivity analysis: per-location vs. drawn-once variability in W
+# =====================================================================
+# The wickiup build cost W is the recurring per-move cost. Its value is
+# uncertain, but that uncertainty can be of two kinds: (i) we may not know
+# the typical build time (epistemic; a single value applies to a given
+# decision-maker across all camps), or (ii) the build time may genuinely
+# vary from camp to camp with local material availability (inherent
+# variability; a fresh value at each camp). These have the same mean cost
+# but different variance: the per-location component averages over the
+# indefinite sequence of camps.
+#
+# Following Supplemental Data 2, we write the cost at camp k of sample s as
+# W_{s,k} = mid_W + a_s + b_{s,k}, splitting the total variance var_W into a
+# drawn-once part a_s (variance (1 - f) * var_W, shared across the sample's
+# camps) and a per-location part b_{s,k} (variance f * var_W, independent
+# across camps). The discounted sum of the per-location parts,
+# sum_{k>=0} b_{s,k} z_s^k (the code's S), has mean 0 and variance
+# f * var_W / (1 - z_s^2). We evaluate it by direct simulation: we draw the
+# per-camp b_{s,k} and accumulate the discounted sum, truncating where the
+# discount weight z_s^k makes the omitted tail negligible (< 1e-4 of its
+# variance). The shared part enters through the exact geometric sum
+# (mid_W + a_s) / (1 - z_s). f = 0 reproduces the main model (W drawn once);
+# f = 1 makes W fully per-location. In the code the sample index s is implicit:
+# each per-sample quantity (a, S, z, ...) is a vector over the Ns samples
+# drawn at a given number of moves.
+#
+# The mean and variance of this cost are derived analytically in Supplemental
+# Data 2 (Mathematics): the mean is independent of f (so the median indifference
+# point does not move) and the variance falls with f (so the spread narrows).
+# Those are the mechanism; the core result computed here is the full
+# distribution of the cross-over (indifference) point, obtained by simulation.
+# We sweep f and record its median and 95% central range. Because
+# P(tipi preferred at m) = P(indifference point < m), these are read off the
+# crossing points of the probability curve.
+
+var_W  <- (max_W - min_W)^2 / 24   # variance of the symmetric triangular W
+half_W <- (max_W - min_W) / 2      # half-width, for the centered shared part
+
+# Probability tipi is preferred at a given number of moves per year, for a
+# given per-location variance fraction f.
+sens_P <- function(moves, f, Ns) {
+  Td   <- Y / moves
+  Hs   <- rgamma(Ns, shape = alpha_H, rate = beta_H)
+  Ds   <- rgamma(Ns, shape = alpha_D, rate = beta_D)
+  rhos <- rtriangle(Ns, a = min_rho, b = max_rho, c = mid_rho)
+  z    <- (1 + rhos)^(-Td / Y)
+  perp <- 1 / (1 - z)                          # sum_{k>=0} z^k
+  a    <- sqrt(1 - f) * rtriangle(Ns, a = -half_W, b = half_W, c = 0)
+  # Direct simulation of S = sum_{k>=0} b_k z^k (per-location fluctuations),
+  # truncated where the omitted tail contributes < 1e-4 of Var(S). max(z) sets
+  # the truncation so the tail is negligible for every sample.
+  S <- numeric(Ns)
+  if (f > 0) {
+    Kmax <- ceiling(log(1e-4) / (2 * log(max(z))))
+    zpow <- rep(1, Ns)                         # z^0
+    for (k in 0:Kmax) {
+      bk   <- sqrt(f) * rtriangle(Ns, a = -half_W, b = half_W, c = 0)
+      S    <- S + bk * zpow
+      zpow <- zpow * z
+    }
+  }
+  c_wick_s <- (mid_W + a) * perp + S           # shared part (exact) + per-camp (S)
+  c_tipi_s <- Hs + Ds * (perp - 1)             # perp - 1 = z/(1-z) = 1/r
+  mean(c_tipi_s < c_wick_s)
+}
+
+f_vals     <- c(0, 0.25, 0.5, 0.75, 1)
+moves_grid <- seq(0.7, 9, by = 0.1)   # spans the 2.5%-97.5% crossings for all f
+Ns_sens    <- 50000
+
+sens_summary <- data.frame(f = f_vals, median = NA, lo95 = NA, hi95 = NA, width = NA)
+sens_curves  <- matrix(NA, nrow = length(moves_grid), ncol = length(f_vals))
+for (j in seq_along(f_vals)) {
+  Pj <- sapply(moves_grid, sens_P, f = f_vals[j], Ns = Ns_sens)
+  sens_curves[, j] <- Pj
+  qs <- approx(x = Pj, y = moves_grid, xout = c(0.025, 0.5, 0.975), ties = mean)$y
+  sens_summary$lo95[j]   <- qs[1]
+  sens_summary$median[j] <- qs[2]
+  sens_summary$hi95[j]   <- qs[3]
+  sens_summary$width[j]  <- qs[3] - qs[1]
+}
+
+cat("\nSensitivity to per-location vs drawn-once variability in W\n")
+cat("(f = fraction of W's variance that is per-location; f=0 is the main model):\n")
+print(round(sens_summary, 3))
+
+# Figure: probability curves for f = 0 (drawn once) and f = 1 (per location)
+pdf('sensitivity_W_pcurves.pdf')
+plot(moves_grid, sens_curves[, 1], type = 'l', lwd = 3, col = 'black',
+     xlab = 'Moves per Year', ylab = 'Probability Tipi is Preferred',
+     xlim = c(0, 10), ylim = c(0, 1))
+lines(moves_grid, sens_curves[, length(f_vals)], lwd = 3, lty = 2, col = 'grey40')
+abline(h = 0.5, col = 'grey', lty = 3)
+legend('bottomright', bty = 'n', lwd = 3, lty = c(1, 2), col = c('black', 'grey40'),
+       legend = c('f = 0 (W drawn once, epistemic)',
+                  'f = 1 (W drawn per location)'))
+dev.off()
+
+# Figure: median and 95% central range of the indifference point vs f
+pdf('sensitivity_W_range.pdf')
+plot(sens_summary$f, sens_summary$median, type = 'b', pch = 16, lwd = 2,
+     ylim = range(c(sens_summary$lo95, sens_summary$hi95)),
+     xlab = 'Fraction of W variance that is per-location (f)',
+     ylab = 'Indifference point (moves per year)')
+lines(sens_summary$f, sens_summary$lo95, type = 'b', pch = 1, lty = 2)
+lines(sens_summary$f, sens_summary$hi95, type = 'b', pch = 1, lty = 2)
+legend('right', bty = 'n', pch = c(16, 1), lty = c(1, 2),
+       legend = c('median', '95% central range'))
+dev.off()
