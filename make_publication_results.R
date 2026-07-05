@@ -21,7 +21,7 @@ rm(list=ls())
 set.seed(339652)
 
 # Helper function to simulate shelter choice
-simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
+simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_D, stdv_D,
                                     min_W, max_W, min_rho, max_rho, Y,
                                     fixed_rho = NULL) {
   # Simulates shelter choice probabilities and calculates indifference point
@@ -30,7 +30,7 @@ simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
   #   T_vect: Vector of time periods between moves (in days)
   #   S: Number of samples per T
   #   mean_H, stdv_H: Mean and standard deviation for tipi construction time
-  #   mean_M, stdv_M: Mean and standard deviation for tipi setup/teardown time
+  #   mean_D, stdv_D: Mean and standard deviation for tipi setup/teardown time
   #   min_W, max_W: Min and max for wickiup construction time
   #   min_rho, max_rho: Min and max for annualized time discount factor
   #   Y: Number of days per year
@@ -42,8 +42,8 @@ simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
   # Calculate gamma distribution parameters for H and M
   alpha_H <- (mean_H / stdv_H)^2
   beta_H <- mean_H / (stdv_H^2)
-  alpha_M <- (mean_M / stdv_M)^2
-  beta_M <- mean_M / (stdv_M^2)
+  alpha_D <- (mean_D / stdv_D)^2
+  beta_D <- mean_D / (stdv_D^2)
   
   mid_W <- (min_W + max_W) / 2
   mid_rho <- (min_rho + max_rho) / 2
@@ -54,7 +54,7 @@ simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
   for (T in T_vect) {
     # Make S draws for each of H, M, W, and rho (if not fixed)
     H <- rgamma(n = S, shape = alpha_H, rate = beta_H)
-    M <- rgamma(n = S, shape = alpha_M, rate = beta_M)
+    D <- rgamma(n = S, shape = alpha_D, rate = beta_D)
     W <- rtriangle(n = S, a = min_W, b = max_W, c = mid_W)
     
     if (is.null(fixed_rho)) {
@@ -66,9 +66,13 @@ simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
     # Calculate r, the per period discount factor
     r <- (1 + rho)^(T/Y) - 1
 
-    # Calculate time discounted labor costs
-    c_tipi <- H + M/r
-    c_wick <- W/r
+    # Calculate time discounted labor costs. Both shelters must provide shelter
+    # from day 0. The tipi is built once (H at day 0) and re-erected at each
+    # subsequent move (D at days T, 2T, ...), giving H + D/r. The wickiup is
+    # rebuilt at the start of EVERY camp, including day 0 (W at days 0, T, 2T,
+    # ...), giving a perpetuity that starts at day 0: W + W/r.
+    c_tipi <- H + D/r
+    c_wick <- W + W/r
 
     # Calculate probabilities
     num_tipi <- sum(c_tipi < c_wick)
@@ -96,7 +100,7 @@ simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
 # Set parameter values.
 #
 # H is the construction time for a tipi, which is drawn from a gamma
-# distribution with a mean of 211.5 hours and a standard deviation of 0.25
+# distribution with a mean of 226.5 hours and a standard deviation of 0.25
 # times the mean. The gamma distribution probability density function is
 #
 # f(x, alpha, beta) = beta^alpha * x^(alpha-1) * exp(-beta*x) / Gamma(alpha),
@@ -108,18 +112,18 @@ simulate_shelter_choice <- function(T_vect, S, mean_H, stdv_H, mean_M, stdv_M,
 #
 # alpha = mu_gamma^2 / var_gamma  = mu_gamma^2 / stdv_gamma^2
 # beta = mu_gamma / var_gamma = mu_gamma / stdv_gamma^2
-mean_H <- 211.5
+mean_H <- 226.5
 stdv_H <- mean_H * .25
 alpha_H <- (mean_H / stdv_H)^2
 beta_H <- mean_H / (stdv_H^2)
 
-# M is the total set-up and tear-down time of a tipi, which is drawn from a
+# D is the total set-up and tear-down time of a tipi (the per-move cost), drawn from a
 # gamma distribution with a mean of .834 hours and a standard deviation of
 # 0.25 times the mean.
-mean_M <- .834
-stdv_M <- mean_M * .25
-alpha_M <- (mean_M / stdv_M)^2
-beta_M <- mean_M / (stdv_M^2)
+mean_D <- .834
+stdv_D <- mean_D * .25
+alpha_D <- (mean_D / stdv_D)^2
+beta_D <- mean_D / (stdv_D^2)
 
 # W is the construction time of a wickiup, which is drawn from a symmetric
 # triangular distribution (isosceles triangular distribution) ranging from
@@ -148,21 +152,22 @@ T_vect <- seq(1, Y, by=1)
 S <- 1000000
 
 # Run simulations for different rho values
-results_variable <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_M,
-                                            stdv_M, min_W, max_W, min_rho,
+results_variable <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_D,
+                                            stdv_D, min_W, max_W, min_rho,
                                             max_rho, Y)
-results_min <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_M,
-                                       stdv_M, min_W, max_W, min_rho, max_rho,
+results_min <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_D,
+                                       stdv_D, min_W, max_W, min_rho, max_rho,
                                        Y, fixed_rho = min_rho)
-results_mid <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_M,
-                                       stdv_M, min_W, max_W, min_rho, max_rho,
+results_mid <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_D,
+                                       stdv_D, min_W, max_W, min_rho, max_rho,
                                        Y, fixed_rho = (min_rho + max_rho) / 2)
-results_max <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_M,
-                                       stdv_M, min_W, max_W, min_rho, max_rho,
+results_max <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_D,
+                                       stdv_D, min_W, max_W, min_rho, max_rho,
                                        Y, fixed_rho = max_rho)
 
-# Compute deterministic transition points
-T_determ <- Y * log((mean_H + mid_W - mean_M)/mean_H) / log(1 + mid_rho)
+# Compute deterministic transition point. Setting c_tipi = c_wick with mean
+# values (H + D/r = W + W/r) gives (1+rho)^(T/Y) = (H - D)/(H - W), hence:
+T_determ <- Y * log((mean_H - mean_D)/(mean_H - mid_W)) / log(1 + mid_rho)
 moves_per_year_determ <- Y / T_determ
 
 # Make Figure 1
