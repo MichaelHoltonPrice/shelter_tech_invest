@@ -446,3 +446,26 @@ lines(sens_summary$f, sens_summary$hi95, type = 'b', pch = 1, lty = 2)
 legend('right', bty = 'n', pch = c(16, 1), lty = c(1, 2),
        legend = c('median', '95% central range'))
 dev.off()
+
+# =====================================================================
+# Comparative-statics figure: indifference point vs. cost profile
+# =====================================================================
+# The deterministic indifference point,
+#   Mhat = log(1 + rho) / log((H - D)/(H - W)),
+# plotted as a function of the wickiup build cost W (with H and D at their
+# means), for three discount rates. Shows how the housing cost profile moves
+# the mobility threshold, before the specific tipi/wickiup values are inserted.
+# Uses the closed form only (no Monte Carlo).
+Mhat_det <- function(H, D, W, rho) log(1 + rho) / log((H - D) / (H - W))
+W_seq <- seq(5, 30, by = 0.1)
+pdf('comparative_statics.pdf')
+plot(W_seq, Mhat_det(mean_H, mean_D, W_seq, min_rho),
+     type = 'l', lwd = 2, col = 'black', ylim = c(0, 8),
+     xlab = 'Wickiup build cost W (hours)',
+     ylab = 'Indifference point (moves per year)')
+lines(W_seq, Mhat_det(mean_H, mean_D, W_seq, mid_rho), lwd = 2, col = 'grey40')
+lines(W_seq, Mhat_det(mean_H, mean_D, W_seq, max_rho), lwd = 2, col = 'grey70')
+legend('topright', bty = 'n', lwd = 2, col = c('black', 'grey40', 'grey70'),
+       legend = c(paste('rho =', min_rho), paste('rho =', mid_rho),
+                  paste('rho =', max_rho)))
+dev.off()
