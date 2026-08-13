@@ -170,15 +170,94 @@ results_max <- simulate_shelter_choice(T_vect, S, mean_H, stdv_H, mean_D,
 T_determ <- Y * log((mean_H - mean_D)/(mean_H - mid_W)) / log(1 + mid_rho)
 moves_per_year_determ <- Y / T_determ
 
-# Make Figure 1
+# Deterministic indifference curves. For Figures 1 and 2, M and rho are fixed
+# and r is the corresponding per-move discount rate. Figure 3 uses the closed
+# form for the indifference point in moves per year. These equations all follow
+# from setting H + D/r equal to W + W/r.
+indifference_H <- function(W, D, rho, M) {
+  r <- (1 + rho)^(1/M) - 1
+  W + (W - D)/r
+}
+
+indifference_D <- function(W, H, rho, M) {
+  r <- (1 + rho)^(1/M) - 1
+  W + r * (W - H)
+}
+
+indifference_M <- function(W, H, D, rho) {
+  log(1 + rho) / log((H - D)/(H - W))
+}
+
+# Show W from 1 to 20 hours. R determines each y-axis from the resulting
+# indifference curve; infeasible negative or nonfinite solutions are omitted.
+# Use the deterministic indifference point, rounded to 3.16 moves per year,
+# as the fixed mobility level in the H-versus-W and D-versus-W curves.
+nominal_M <- 3.16
+W_indifference_limits <- c(1, 20)
+W_indifference <- seq(W_indifference_limits[1], W_indifference_limits[2],
+                      by = 0.1)
+
+# Make Figure 1: tipi construction cost H versus wickiup cost W.
+H_indifference <- indifference_H(W_indifference, mean_D, mid_rho, nominal_M)
+H_indifference[!is.finite(H_indifference) | H_indifference < 0] <- NA_real_
+pdf('Figure_1_indifference_H_vs_W.pdf')
+plot(W_indifference, H_indifference,
+     type = 'n',
+     xlim = W_indifference_limits,
+     xlab = 'Wickiup Construction Cost, W (hours)',
+     ylab = 'Tipi Construction Cost, H (hours)')
+abline(v = mid_W, h = mean_H, col = 'grey70', lwd = 2)
+lines(W_indifference, H_indifference, lwd = 3, col = 'black')
+H_plot_range <- range(H_indifference, finite = TRUE)
+text(4.0, H_plot_range[1] + 0.85 * diff(H_plot_range), 'Wickiup preferred')
+text(16.0, H_plot_range[1] + 0.15 * diff(H_plot_range), 'Tipi preferred')
+dev.off()
+
+# Make Figure 2: tipi take-down/setup cost D versus wickiup cost W.
+D_indifference <- indifference_D(W_indifference, mean_H, mid_rho, nominal_M)
+D_indifference[!is.finite(D_indifference) | D_indifference < 0] <- NA_real_
+pdf('Figure_2_indifference_D_vs_W.pdf')
+plot(W_indifference, D_indifference,
+     type = 'n',
+     xlim = W_indifference_limits,
+     xlab = 'Wickiup Construction Cost, W (hours)',
+     ylab = 'Tipi Take-Down and Setup Cost, D (hours)')
+abline(v = mid_W, h = mean_D, col = 'grey70', lwd = 2)
+lines(W_indifference, D_indifference, lwd = 3, col = 'black')
+D_plot_range <- range(D_indifference, finite = TRUE)
+text(5.0, D_plot_range[1] + 0.85 * diff(D_plot_range),
+     'Wickiup preferred')
+text(16.0, D_plot_range[1] + 0.15 * diff(D_plot_range), 'Tipi preferred')
+dev.off()
+
+# Make Figure 3: indifference point M versus wickiup cost W.
+M_indifference <- indifference_M(W_indifference, mean_H, mean_D, mid_rho)
+M_indifference[!is.finite(M_indifference) | M_indifference <= 0] <- NA_real_
+pdf('Figure_3_indifference_M_vs_W.pdf')
+plot(W_indifference, M_indifference,
+     type = 'n', log = 'y',
+     xlim = W_indifference_limits,
+     xlab = 'Wickiup Construction Cost, W (hours)',
+     ylab = 'Moves per Year, M')
+abline(v = mid_W, h = nominal_M, col = 'grey70', lwd = 2)
+lines(W_indifference, M_indifference, lwd = 3, col = 'black')
+M_plot_range <- range(M_indifference, finite = TRUE)
+M_log_range <- log10(M_plot_range)
+text(16.0, 10^(M_log_range[1] + 0.85 * diff(M_log_range)),
+     'Tipi preferred')
+text(4.0, 10^(M_log_range[1] + 0.225 * diff(M_log_range)),
+     'Wickiup preferred')
+dev.off()
+
+# Make Figure 4
 # We limit the plot x-limits to 10 moves per year or less, since by then the
 # probability has already plateaued to 1.
 moves_per_year <- Y / T_vect
-ind_fig1 <- which(moves_per_year <= 10)
-x_fig1 <- moves_per_year[ind_fig1]
-y_fig1 <- results_variable$p_vect[ind_fig1]
-pdf('p_vs_yearly_moves.pdf')
-    plot(x_fig1, y_fig1,
+ind_probability_plot <- which(moves_per_year <= 10)
+moves_probability_plot <- moves_per_year[ind_probability_plot]
+p_probability_plot <- results_variable$p_vect[ind_probability_plot]
+pdf('Figure_4_p_vs_yearly_moves.pdf')
+    plot(moves_probability_plot, p_probability_plot,
     xlab='Moves per Year',
     ylab='Probability Tipi is Preferred',
     type='l',
@@ -205,8 +284,8 @@ pdf('p_vs_yearly_moves.pdf')
            bty = "n")
 dev.off()
 
-# Make Figure 2
-pdf('p_vs_T.pdf')
+# Make Figure 5
+pdf('Figure_5_p_vs_days_between_moves.pdf')
     plot(T_vect, results_variable$p_vect,
     xlab='Days between Moves',
     ylab='Probability Tipi is Preferred',
@@ -237,13 +316,15 @@ pdf('p_vs_T.pdf')
            bty = "n")
 dev.off()
 
-# Make Figure 3 (p_vect versus moves per year with fixed rho values)
-pdf('p_vs_yearly_moves_fixed_rho.pdf')
-plot(x_fig1, results_min$p_vect[ind_fig1],
+# Make Figure 6 (p_vect versus moves per year with fixed rho values)
+pdf('Figure_6_p_vs_yearly_moves_fixed_rho.pdf')
+plot(moves_probability_plot, results_min$p_vect[ind_probability_plot],
      xlab='Moves per Year', ylab='Probability Tipi is Preferred',
      type='l', lwd=2, col='black', xaxt='n', ylim=c(0,1))
-lines(x_fig1, results_mid$p_vect[ind_fig1], col='gray50', lwd=2)
-lines(x_fig1, results_max$p_vect[ind_fig1], col='gray70', lwd=2)
+lines(moves_probability_plot, results_mid$p_vect[ind_probability_plot],
+      col='gray50', lwd=2)
+lines(moves_probability_plot, results_max$p_vect[ind_probability_plot],
+      col='gray70', lwd=2)
 
 axis(1, at=c(0, 2, 4, 6, 8, 10))
 abline(h = 0.5, col = "gray50", lty = 2)
@@ -256,20 +337,20 @@ legend("bottomright",
        lty=c(1, 1, 1), lwd=2, cex=0.8)
 dev.off()
 
-# Make Figure 4 (mean values of c versus moves per year)
+# Make Figure 7 (mean values of c versus moves per year)
 moves_per_year <- Y / T_vect
-ind_fig4 <- which(moves_per_year <= 10)
-x_fig4 <- moves_per_year[ind_fig4]
+ind_cost_plot <- which(moves_per_year <= 10)
+moves_cost_plot <- moves_per_year[ind_cost_plot]
 
-pdf('mean_c_vs_moves_per_year.pdf')
-plot(x_fig4, results_variable$mean_c_tipi[ind_fig4],
+pdf('Figure_7_mean_cost_vs_moves_per_year.pdf')
+plot(moves_cost_plot, results_variable$mean_c_tipi[ind_cost_plot],
      xlab='Moves per Year',
      ylab='Mean Discounted Labor Cost',
      type='l', lwd=3, col='black',
-     ylim=range(c(results_variable$mean_c_tipi[ind_fig4], 
-                  results_variable$mean_c_wick[ind_fig4])))
-lines(x_fig4, results_variable$mean_c_wick[ind_fig4], col='black', lwd=3,
-      lty=3)
+     ylim=range(c(results_variable$mean_c_tipi[ind_cost_plot],
+                  results_variable$mean_c_wick[ind_cost_plot])))
+lines(moves_cost_plot, results_variable$mean_c_wick[ind_cost_plot],
+      col='black', lwd=3, lty=3)
 
 legend("topleft", 
        legend=c("Tipi", "Wickiup"),
@@ -281,19 +362,19 @@ dev.off()
 
 # Print indifference points
 cat("Indifference points (moves per year):\n")
-cat("Variable rho:", results_variable$x_indif, "\n")
-cat("Deterministic:", moves_per_year_determ, "\n")
-cat("Min rho:", results_min$x_indif, "\n")
-cat("Mid rho:", results_mid$x_indif, "\n")
-cat("Max rho:", results_max$x_indif, "\n")
+cat("H, D, W, and rho drawn:", results_variable$x_indif, "\n")
+cat("All parameters fixed at nominal values:", moves_per_year_determ, "\n")
+cat("H, D, and W drawn; rho fixed at", min_rho, ":", results_min$x_indif, "\n")
+cat("H, D, and W drawn; rho fixed at", mid_rho, ":", results_mid$x_indif, "\n")
+cat("H, D, and W drawn; rho fixed at", max_rho, ":", results_max$x_indif, "\n")
 
 # Print indifference points for T (days between moves)
 cat("\nIndifference points (days between moves):\n")
-cat("Variable rho:", results_variable$T_indif, "\n")
-cat("Deterministic:", T_determ, "\n")
-cat("Min rho:", results_min$T_indif, "\n")
-cat("Mid rho:", results_mid$T_indif, "\n")
-cat("Max rho:", results_max$T_indif, "\n")
+cat("H, D, W, and rho drawn:", results_variable$T_indif, "\n")
+cat("All parameters fixed at nominal values:", T_determ, "\n")
+cat("H, D, and W drawn; rho fixed at", min_rho, ":", results_min$T_indif, "\n")
+cat("H, D, and W drawn; rho fixed at", mid_rho, ":", results_mid$T_indif, "\n")
+cat("H, D, and W drawn; rho fixed at", max_rho, ":", results_max$T_indif, "\n")
 
 # Print mean costs for 4 moves per year
 ind4 <- which.min(abs(moves_per_year - 4))
@@ -303,7 +384,7 @@ cat("c_tipi at 4 moves:", c_tipi4, "\n")
 cat("c_wick at 4 moves:", c_wick4, "\n")
 cat("Relative difference at 4 moves:", (c_wick4-c_tipi4)/c_tipi4, "\n")
 
-# Add a plot of tipi diameter versus total number of hides for the supplement
+# Make Figure S1: tipi diameter versus total number of hides.
 # See:
 # https://albertashistoricplaces.com/2024/03/13/tipis-bison-and-dogs-visualizing-an-archaeological-feature-in-southern-alberta/
 tipi_diameters <- c(2.31, 4.60, 8.57)
@@ -322,7 +403,7 @@ predicted_diameter <- (target_total_hides - tipi_fit_intercept)/tipi_fit_slope
 print(paste("Predicted tipi diameter for 15 total hides:", predicted_diameter))
 
 # Plot the total number of hides against the tipi diameter, along with the fit
-pdf('tipi_total_hides_versus_diameter.pdf')
+pdf('Figure_S1_tipi_total_hides_vs_diameter.pdf')
 plot(tipi_diameters, tipi_total_hides,
      xlab='Tipi Diameter (meters)',
      ylab='Total Number of Hides',
@@ -423,8 +504,8 @@ cat("\nSensitivity to per-location vs drawn-once variability in W\n")
 cat("(f = fraction of W's variance that is per-location; f=0 is the main model):\n")
 print(round(sens_summary, 3))
 
-# Figure: probability curves for f = 0 (drawn once) and f = 1 (per location)
-pdf('sensitivity_W_pcurves.pdf')
+# Make Figure S2: probability curves for f = 0 and f = 1.
+pdf('Figure_S2_sensitivity_W_pcurves.pdf')
 plot(moves_grid, sens_curves[, 1], type = 'l', lwd = 3, col = 'black',
      xlab = 'Moves per Year', ylab = 'Probability Tipi is Preferred',
      xlim = c(0, 10), ylim = c(0, 1))
@@ -435,8 +516,8 @@ legend('bottomright', bty = 'n', lwd = 3, lty = c(1, 2), col = c('black', 'grey4
                   'f = 1 (W drawn per location)'))
 dev.off()
 
-# Figure: median and 95% central range of the indifference point vs f
-pdf('sensitivity_W_range.pdf')
+# Make Figure S3: median and 95% central range of the indifference point vs f.
+pdf('Figure_S3_sensitivity_W_range.pdf')
 plot(sens_summary$f, sens_summary$median, type = 'b', pch = 16, lwd = 2,
      ylim = range(c(sens_summary$lo95, sens_summary$hi95)),
      xlab = 'Fraction of W variance that is per-location (f)',
@@ -445,27 +526,4 @@ lines(sens_summary$f, sens_summary$lo95, type = 'b', pch = 1, lty = 2)
 lines(sens_summary$f, sens_summary$hi95, type = 'b', pch = 1, lty = 2)
 legend('right', bty = 'n', pch = c(16, 1), lty = c(1, 2),
        legend = c('median', '95% central range'))
-dev.off()
-
-# =====================================================================
-# Comparative-statics figure: indifference point vs. cost profile
-# =====================================================================
-# The deterministic indifference point,
-#   Mhat = log(1 + rho) / log((H - D)/(H - W)),
-# plotted as a function of the wickiup build cost W (with H and D at their
-# means), for three discount rates. Shows how the housing cost profile moves
-# the mobility threshold, before the specific tipi/wickiup values are inserted.
-# Uses the closed form only (no Monte Carlo).
-Mhat_det <- function(H, D, W, rho) log(1 + rho) / log((H - D) / (H - W))
-W_seq <- seq(5, 30, by = 0.1)
-pdf('comparative_statics.pdf')
-plot(W_seq, Mhat_det(mean_H, mean_D, W_seq, min_rho),
-     type = 'l', lwd = 2, col = 'black', ylim = c(0, 8),
-     xlab = 'Wickiup build cost W (hours)',
-     ylab = 'Indifference point (moves per year)')
-lines(W_seq, Mhat_det(mean_H, mean_D, W_seq, mid_rho), lwd = 2, col = 'grey40')
-lines(W_seq, Mhat_det(mean_H, mean_D, W_seq, max_rho), lwd = 2, col = 'grey70')
-legend('topright', bty = 'n', lwd = 2, col = c('black', 'grey40', 'grey70'),
-       legend = c(paste('rho =', min_rho), paste('rho =', mid_rho),
-                  paste('rho =', max_rho)))
 dev.off()
