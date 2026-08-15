@@ -176,14 +176,14 @@ indifference_M <- function(W, H, D, rho) {
   log(1 + rho) / log((H - D)/(H - W))
 }
 
-# Show W from 1 to 20 hours and D from 0 to 8 hours. Infeasible negative or
+# Show W from 1 to 20 hours and D from 0 to 9.85 hours. Infeasible negative or
 # nonfinite solutions are omitted. The deterministic indifference point is
 # rounded to 3.16 moves per year for the nominal reference line.
 nominal_M <- 3.16
 W_indifference_limits <- c(1, 20)
 W_indifference <- seq(W_indifference_limits[1], W_indifference_limits[2],
                       by = 0.1)
-D_indifference_limits <- c(0, 8)
+D_indifference_limits <- c(0, 9.85)
 D_indifference <- seq(D_indifference_limits[1], D_indifference_limits[2],
                       by = 0.01)
 
@@ -213,14 +213,17 @@ M_indifference_D[!is.finite(M_indifference_D) |
 pdf('Figure_2_indifference_M_vs_D.pdf')
 plot(D_indifference, M_indifference_D,
      type = 'n',
+     log = 'y',
      xlim = D_indifference_limits,
-     ylim = c(0, 15),
      xlab = 'Tipi Take-Down and Setup Cost, D (hours)',
      ylab = 'Moves per Year, M')
 abline(v = mean_D, h = nominal_M, col = 'grey70', lwd = 2)
 lines(D_indifference, M_indifference_D, lwd = 3, col = 'black')
-text(2.0, 12.0, 'Tipi preferred')
-text(6.0, 2.0, 'Wickiup preferred')
+M_D_plot_range <- range(M_indifference_D, finite = TRUE)
+M_D_log_range <- log10(M_D_plot_range)
+text(3.0, 10^(M_D_log_range[1] + 0.85 * diff(M_D_log_range)),
+     'Tipi preferred')
+text(8.0, 5.0, 'Wickiup preferred')
 dev.off()
 
 # Make Figure 3
